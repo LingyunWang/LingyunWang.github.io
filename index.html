@@ -3,17 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>方格线移动游戏</title>
+    <title>方格线移动颜色切换游戏</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     
+    <!-- Tailwind 配置 -->
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
                         primary: '#3B82F6',
+                        secondary: '#10B981',
                         accent: '#EF4444',
+                        neutral: '#F3F4F6',
+                    },
+                    fontFamily: {
+                        game: ['Arial', 'sans-serif'],
                     },
                 }
             }
@@ -28,15 +34,18 @@
             .player-marker {
                 @apply w-6 h-6 bg-primary rounded-full transition-all duration-150 z-10;
             }
-            .grid-line {
-                @apply bg-gray-400 absolute;
+            .btn-control {
+                @apply w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center text-xl hover:bg-primary hover:text-white transition-all duration-200 active:scale-95;
+            }
+            .grid-container {
+                @apply border-2 border-gray-400 rounded-lg overflow-hidden relative;
             }
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4 font-game">
     <div class="max-w-3xl w-full bg-white rounded-xl shadow-lg p-6 md:p-8">
-        <h1 class="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-6">方格线移动游戏</h1>
+        <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-center text-gray-800 mb-6">方格线移动颜色切换游戏</h1>
         
         <div class="mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-2">
@@ -46,43 +55,55 @@
                     <option value="4" selected>4×4</option>
                     <option value="5">5×5</option>
                     <option value="6">6×6</option>
-                    <option value="7">7×7</option>
                 </select>
             </div>
             
             <div class="flex items-center gap-4">
-                <button id="reset-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md transition-all">
-                    <i class="fa fa-refresh mr-1"></i> 重置
+                <button id="reset-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md transition-all flex items-center gap-2">
+                    <i class="fa fa-refresh"></i> 重置
                 </button>
                 <div class="text-gray-700">
-                    步数: <span id="move-count" class="font-bold text-primary">0</span>
+                    移动次数: <span id="move-count" class="font-bold text-primary">0</span>
                 </div>
             </div>
         </div>
         
-        <!-- 游戏区域 -->
+        <!-- 游戏网格容器 -->
         <div class="flex justify-center mb-8">
-            <div id="game-container" class="relative border-2 border-gray-400 rounded-lg"></div>
+            <div id="game-container" class="relative">
+                <div id="game-grid" class="grid-container"></div>
+                <div id="player-marker" class="player-marker absolute"></div>
+            </div>
         </div>
         
         <!-- 控制按钮 -->
         <div class="flex justify-center gap-4">
             <div class="flex flex-col items-center gap-4">
-                <button id="up-btn" class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center text-xl hover:bg-primary hover:text-white transition-all">
+                <button id="up-btn" class="btn-control">
                     <i class="fa fa-arrow-up"></i>
                 </button>
                 <div class="flex gap-4">
-                    <button id="left-btn" class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center text-xl hover:bg-primary hover:text-white transition-all">
+                    <button id="left-btn" class="btn-control">
                         <i class="fa fa-arrow-left"></i>
                     </button>
-                    <button id="down-btn" class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center text-xl hover:bg-primary hover:text-white transition-all">
+                    <button id="down-btn" class="btn-control">
                         <i class="fa fa-arrow-down"></i>
                     </button>
-                    <button id="right-btn" class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center text-xl hover:bg-primary hover:text-white transition-all">
+                    <button id="right-btn" class="btn-control">
                         <i class="fa fa-arrow-right"></i>
                     </button>
                 </div>
             </div>
+        </div>
+        
+        <!-- 游戏说明 -->
+        <div class="mt-8 text-gray-600 text-sm md:text-base">
+            <h2 class="font-bold text-gray-800 mb-2">游戏说明:</h2>
+            <ul class="list-disc pl-5 space-y-1">
+                <li>使用方向键或屏幕按钮控制蓝色标记沿格子线移动</li>
+                <li>穿过格子线时，相邻的格子会在红色和白色之间切换</li>
+                <li>尝试将所有格子变成红色，看看需要多少步数！</li>
+            </ul>
         </div>
     </div>
 
@@ -90,64 +111,61 @@
         document.addEventListener('DOMContentLoaded', () => {
             // 游戏状态
             let gameState = {
-                gridSize: 4,          // 网格大小
+                gridSize: 4,          // 默认4×4网格
                 cellSize: 60,         // 每个格子的大小(px)
-                // 玩家位置使用像素坐标，确保沿网格线移动
-                playerPosition: {x: 0, y: 0},  
-                grid: [],             // 网格状态，true为红色，false为白色
+                playerPosition: {x: 0, y: 0},  // 玩家在网格线上的位置(线交叉点坐标)
+                grid: [],             // 网格状态，true表示红色，false表示白色
                 moveCount: 0,         // 移动次数
-                crossingLines: new Set() // 已穿过的线，防止重复切换
+                lastCrossedLine: null // 最后穿过的线，防止重复切换
             };
             
             // DOM元素
+            const gameGrid = document.getElementById('game-grid');
+            const playerMarker = document.getElementById('player-marker');
             const gameContainer = document.getElementById('game-container');
             const gridSizeSelect = document.getElementById('grid-size');
             const resetBtn = document.getElementById('reset-btn');
             const moveCountDisplay = document.getElementById('move-count');
-            const directionButtons = {
-                up: document.getElementById('up-btn'),
-                down: document.getElementById('down-btn'),
-                left: document.getElementById('left-btn'),
-                right: document.getElementById('right-btn')
-            };
-            
-            // 初始化玩家标记
-            const playerMarker = document.createElement('div');
-            playerMarker.className = 'player-marker absolute';
-            gameContainer.appendChild(playerMarker);
+            const upBtn = document.getElementById('up-btn');
+            const downBtn = document.getElementById('down-btn');
+            const leftBtn = document.getElementById('left-btn');
+            const rightBtn = document.getElementById('right-btn');
             
             // 初始化游戏
             function initGame() {
-                // 清空游戏容器
-                gameContainer.innerHTML = '';
-                gameContainer.appendChild(playerMarker);
-                
-                // 更新游戏状态
+                // 重置游戏状态
                 gameState.gridSize = parseInt(gridSizeSelect.value);
-                gameState.cellSize = window.innerWidth < 640 ? 50 : 60;
-                const startPos = 0; // 从左上角网格线交点开始
-                gameState.playerPosition = {x: startPos, y: startPos};
+                gameState.cellSize = window.innerWidth < 640 ? 40 : 60; // 响应式单元格大小
+                gameState.playerPosition = {x: 0, y: 0};  // 从左上角开始
                 gameState.moveCount = 0;
-                gameState.crossingLines = new Set();
+                gameState.lastCrossedLine = null;
                 moveCountDisplay.textContent = '0';
                 
-                // 初始化网格状态（全部白色）
+                // 初始化网格 - 全部为白色(false)
                 gameState.grid = Array(gameState.gridSize)
                     .fill()
                     .map(() => Array(gameState.gridSize).fill(false));
                 
-                // 绘制网格和网格线
-                drawGrid();
+                // 渲染网格和玩家
+                renderGrid();
                 updatePlayerPosition();
             }
             
-            // 绘制网格和网格线
-            function drawGrid() {
-                const containerSize = gameState.gridSize * gameState.cellSize;
-                gameContainer.style.width = `${containerSize}px`;
-                gameContainer.style.height = `${containerSize}px`;
+            // 渲染网格
+            function renderGrid() {
+                // 清空现有内容
+                gameGrid.innerHTML = '';
                 
-                // 绘制格子
+                // 设置网格容器大小
+                const gridDimension = gameState.gridSize * gameState.cellSize;
+                gameGrid.style.width = `${gridDimension}px`;
+                gameGrid.style.height = `${gridDimension}px`;
+                
+                // 设置游戏容器大小（为了标记能在边缘显示完整）
+                gameContainer.style.width = `${gridDimension}px`;
+                gameContainer.style.height = `${gridDimension}px`;
+                
+                // 创建网格单元格
                 for (let y = 0; y < gameState.gridSize; y++) {
                     for (let x = 0; x < gameState.gridSize; x++) {
                         const cell = document.createElement('div');
@@ -157,217 +175,140 @@
                         cell.style.left = `${x * gameState.cellSize}px`;
                         cell.style.top = `${y * gameState.cellSize}px`;
                         cell.style.backgroundColor = gameState.grid[y][x] ? '#EF4444' : '#FFFFFF';
-                        gameContainer.appendChild(cell);
+                        gameGrid.appendChild(cell);
                     }
                 }
-                
-                // 绘制网格线（更清晰地展示线的存在）
-                // 垂直线
-                for (let x = 0; x <= gameState.gridSize; x++) {
-                    const line = document.createElement('div');
-                    line.className = 'grid-line';
-                    line.style.width = '1px';
-                    line.style.height = '100%';
-                    line.style.left = `${x * gameState.cellSize}px`;
-                    line.style.top = '0';
-                    gameContainer.appendChild(line);
-                }
-                
-                // 水平线
-                for (let y = 0; y <= gameState.gridSize; y++) {
-                    const line = document.createElement('div');
-                    line.className = 'grid-line';
-                    line.style.width = '100%';
-                    line.style.height = '1px';
-                    line.style.left = '0';
-                    line.style.top = `${y * gameState.cellSize}px`;
-                    gameContainer.appendChild(line);
-                }
             }
             
-            // 更新玩家位置
+            // 更新玩家位置显示
             function updatePlayerPosition() {
-                // 确保玩家始终在线上（网格线交点）
-                playerMarker.style.left = `${gameState.playerPosition.x - 12}px`;
-                playerMarker.style.top = `${gameState.playerPosition.y - 12}px`;
+                // 计算玩家在容器中的绝对位置
+                const left = gameState.playerPosition.x * gameState.cellSize - 12; // 减去一半标记大小
+                const top = gameState.playerPosition.y * gameState.cellSize - 12;
+                
+                playerMarker.style.left = `${left}px`;
+                playerMarker.style.top = `${top}px`;
             }
             
-            // 移动玩家（沿网格线）
-            function movePlayer(direction) {
-                // 计算目标位置（下一个网格线交点）
-                let targetX = gameState.playerPosition.x;
-                let targetY = gameState.playerPosition.y;
+            // 移动玩家（沿格子线）
+            function movePlayer(dx, dy) {
+                // 计算新位置
+                const newX = gameState.playerPosition.x + dx;
+                const newY = gameState.playerPosition.y + dy;
                 
-                switch(direction) {
-                    case 'up':
-                        targetY -= gameState.cellSize;
-                        break;
-                    case 'down':
-                        targetY += gameState.cellSize;
-                        break;
-                    case 'left':
-                        targetX -= gameState.cellSize;
-                        break;
-                    case 'right':
-                        targetX += gameState.cellSize;
-                        break;
-                }
-                
-                // 检查是否在有效范围内
-                const maxPos = gameState.gridSize * gameState.cellSize;
-                if (targetX >= 0 && targetX <= maxPos && targetY >= 0 && targetY <= maxPos) {
-                    // 计算移动路径上穿过的线
-                    const crossedLines = getCrossedLines(gameState.playerPosition, {x: targetX, y: targetY});
-                    
-                    // 处理穿过的每条线
-                    crossedLines.forEach(line => {
-                        const lineKey = `${line.type}-${line.pos}-${line.axis}`;
-                        toggleAdjacentCells(line);
+                // 检查是否在网格线范围内（可以移动到最边缘的线）
+                if (newX >= 0 && newX <= gameState.gridSize && newY >= 0 && newY <= gameState.gridSize) {
+                    // 检查是否穿过了垂直线
+                    if (dx !== 0 && newX !== gameState.playerPosition.x) {
+                        const lineX = dx > 0 ? gameState.playerPosition.x :newX;
                         
-                        // 只处理未穿过的线
-                        if (!gameState.crossingLines.has(lineKey)) {
-                            gameState.crossingLines.add(lineKey);    
-                        }
-                    });
+                        
+                        toggleAdjacentCells(lineX, gameState.playerPosition.y-1, 'horizontal');
+                        gameState.moveCount++;
+                        moveCountDisplay.textContent = gameState.moveCount;
+                    }
+                    
+                    // 检查是否穿过了水平线
+                    if (dy !== 0 && newY !== gameState.playerPosition.y) {
+                        
+                        const lineY = dy > 0 ? gameState.playerPosition.y : newY;
+                        //console.log("Yx", lineY, gameState.playerPosition.x-1);
+                        toggleAdjacentCells(gameState.playerPosition.x - 1, lineY, 'vertical');
+                        gameState.moveCount++;
+                        moveCountDisplay.textContent = gameState.moveCount;
+                        
+                    }
                     
                     // 更新玩家位置
-                    gameState.playerPosition = {x: targetX, y: targetY};
+                    gameState.playerPosition = {x: newX, y: newY};
                     updatePlayerPosition();
                     
-                    // 增加移动计数
-                    gameState.moveCount++;
-                    moveCountDisplay.textContent = gameState.moveCount;
+                    // 重新渲染网格（更新颜色）
+                    renderGrid();
                     
-                    // 重新绘制网格（更新颜色）
-                    drawGrid();
-                    
-                    // 检查胜利条件
+                    // 检查是否所有格子都变成红色
                     checkWinCondition();
                 }
             }
             
-            // 获取移动过程中穿过的线
-            function getCrossedLines(from, to) {
-                const crossedLines = [];
-                
-                // 水平移动（左右）
-                if (from.x !== to.x) {
-                    const direction = from.x < to.x ? 'right' : 'left';
-                    const start = Math.min(from.x, to.x);
-                    const end = Math.max(from.x, to.x);
-                    
-                    // 找出所有穿过的垂直线
-                    for (let x = start + gameState.cellSize; x <= end; x += gameState.cellSize) {
-                        const gridX = x / gameState.cellSize;
-                        const yPos = from.y / gameState.cellSize;
-                        crossedLines.push({
-                            type: 'horizontal',
-                            pos: gridX-1,
-                            axis: yPos
-                        });
-                    }
-                }
-                
-                // 垂直移动（上下）
-                if (from.y !== to.y) {
-                    const direction = from.y < to.y ? 'down' : 'up';
-                    const start = Math.min(from.y, to.y);
-                    const end = Math.max(from.y, to.y);
-                    
-                    // 找出所有穿过的水平线
-                    for (let y = start + gameState.cellSize; y <= end; y += gameState.cellSize) {
-                        const gridY = y / gameState.cellSize;
-                        const xPos = from.x / gameState.cellSize;
-                        crossedLines.push({
-                            type: 'vertical',
-                            pos: xPos,
-                            axis: gridY - 1
-                        });
-                    }
-                }
-                
-                return crossedLines;
-            }
-            
             // 切换线旁边的格子颜色
-            function toggleAdjacentCells(line) {
-                if (line.type === 'vertical') {
-                    // 垂直线：影响左右两个格子
-                    const x = line.pos - 1; // 左边格子的x坐标
-                    const y = line.axis;
-                    
-                    // 切换左边格子（如果存在）
-                    if (x >= 0 && x < gameState.gridSize && y >= 0 && y < gameState.gridSize) {
+            function toggleAdjacentCells(x, y, direction) {
+                if (direction === 'vertical') {
+                    // 垂直线：切换左边和右边的格子（如果存在）
+                    if (x >= 0 && x < gameState.gridSize) {
                         gameState.grid[y][x] = !gameState.grid[y][x];
                     }
-                    
-                    // 切换右边格子（如果存在）
-                    if (x + 1 < gameState.gridSize && y >= 0 && y < gameState.gridSize) {
+                    if (x + 1 < gameState.gridSize) {
                         gameState.grid[y][x + 1] = !gameState.grid[y][x + 1];
                     }
-                } else if (line.type === 'horizontal') {
-                    // 水平线：影响上下两个格子
-                    const x = line.pos; // 上边格子的y坐标
-                    const y = line.axis;
-                    
-                    // 切换上边格子（如果存在）
-                    if (y-1 >= 0 && y-1 < gameState.gridSize && x >= 0 && x < gameState.gridSize) {
-                        gameState.grid[y-1][x] = !gameState.grid[y-1][x];
-                    }
-                    
-                    // 切换下边格子（如果存在）
-                    if (y < gameState.gridSize && x >= 0 && x < gameState.gridSize) {
+                } else if (direction === 'horizontal') {
+                    // 水平线：切换上边和下边的格子（如果存在）
+                    if (y >= 0 && y < gameState.gridSize) {
                         gameState.grid[y][x] = !gameState.grid[y][x];
+                    }
+                    if (y + 1 < gameState.gridSize) {
+                        gameState.grid[y + 1][x] = !gameState.grid[y + 1][x];
                     }
                 }
             }
             
-            // 检查胜利条件
+            // 检查胜利条件（所有格子都为红色）
             function checkWinCondition() {
                 for (let y = 0; y < gameState.gridSize; y++) {
                     for (let x = 0; x < gameState.gridSize; x++) {
                         if (!gameState.grid[y][x]) {
-                            return; // 还有白色格子
+                            return; // 还有白色格子，未胜利
                         }
                     }
                 }
-                setTimeout(() => alert(`恭喜！你用了 ${gameState.moveCount} 步完成了游戏！`), 300);
+                
+                // 所有格子都是红色，游戏胜利
+                setTimeout(() => {
+                    alert(`恭喜！你用了 ${gameState.moveCount} 步将所有格子变成了红色！`);
+                }, 300);
             }
             
             // 事件监听
-            directionButtons.up.addEventListener('click', () => movePlayer('up'));
-            directionButtons.down.addEventListener('click', () => movePlayer('down'));
-            directionButtons.left.addEventListener('click', () => movePlayer('left'));
-            directionButtons.right.addEventListener('click', () => movePlayer('right'));
+            upBtn.addEventListener('click', () => movePlayer(0, -1));
+            downBtn.addEventListener('click', () => movePlayer(0, 1));
+            leftBtn.addEventListener('click', () => movePlayer(-1, 0));
+            rightBtn.addEventListener('click', () => movePlayer(1, 0));
             
             // 键盘控制
             document.addEventListener('keydown', (e) => {
                 switch(e.key) {
-                    case 'ArrowUp': movePlayer('up'); break;
-                    case 'ArrowDown': movePlayer('down'); break;
-                    case 'ArrowLeft': movePlayer('left'); break;
-                    case 'ArrowRight': movePlayer('right'); break;
+                    case 'ArrowUp':
+                        movePlayer(0, -1);
+                        break;
+                    case 'ArrowDown':
+                        movePlayer(0, 1);
+                        break;
+                    case 'ArrowLeft':
+                        movePlayer(-1, 0);
+                        break;
+                    case 'ArrowRight':
+                        movePlayer(1, 0);
+                        break;
                 }
             });
             
             // 重置游戏
             resetBtn.addEventListener('click', initGame);
+            
+            // 改变网格大小
             gridSizeSelect.addEventListener('change', initGame);
             
             // 窗口大小变化时重新调整
             window.addEventListener('resize', () => {
                 const oldSize = gameState.cellSize;
-                gameState.cellSize = window.innerWidth < 640 ? 50 : 60;
+                gameState.cellSize = window.innerWidth < 640 ? 40 : 60;
                 if (oldSize !== gameState.cellSize) {
-                    // 重新计算玩家位置以适应新的单元格大小
-                    const ratio = gameState.cellSize / oldSize;
-                    gameState.playerPosition.x *= ratio;
-                    gameState.playerPosition.y *= ratio;
-                    initGame();
+                    renderGrid();
+                    updatePlayerPosition();
                 }
             });
             
-            // 启动游戏
+            // 初始化游戏
             initGame();
         });
     </script>
